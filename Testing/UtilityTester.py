@@ -1,11 +1,13 @@
 __author__ = 'PacAir'
 import unittest
+import concurrent
 from MarketData.MarketData import *
 from MarketData.Frequency import *
-from Strategy.Strategy import *
 from BackTesting.BackTester import *
 import pandas
 import numpy as np
+import time
+import concurrent.futures
 
 
 class MarketDataTester(unittest.TestCase):
@@ -35,29 +37,6 @@ class MarketDataTester(unittest.TestCase):
         assert len(self.data.index) == 12
 
 
-class StrategyTester(unittest.TestCase):
-
-    def setUp(self):
-        self.data = pandas.DataFrame()
-        self.strategyList = {"MA": "StrategyMovingAverage", "MT": "StrategyMomentum",
-                             "SP": "StrategySupport", "BB": "StrategyBollingerBand"}
-
-    def test_factory_should_return_correct_class(self):
-        result = True
-        for strategyName in self.strategyList:
-            strategy = StrategyFactory.get_strategy(strategyName, self.data)
-            result = result and strategy.__class__.__name__ == self.strategyList[strategyName]
-        assert result
-
-    def test_strategy_should_return_no_signal_given_flat_data(self):
-        self.data = pandas.DataFrame(np.repeat(1, 10))
-        result = []
-        for strategyName in self.strategyList:
-            strategy = StrategyFactory.get_strategy(strategyName, self.data)
-            result.append(strategy.get_trading_decision())
-        assert all(r == 0 for r in result)
-
-
 class BackTestingTester(unittest.TestCase):
 
     def setUp(self):
@@ -65,18 +44,21 @@ class BackTestingTester(unittest.TestCase):
         self.data = pandas.DataFrame(np.repeat(1, 10))
         self.data["MA"] = [0] * 10
 
+    def tearDown(self):
+        print "Actual", self.actual, " | Expected", self.expected, " | Diff", self.expected - self.actual
+
     def action(self):
-        actual = BackTester.run_back_testing(self.data, "MA")
+        self.actual = BackTester.run_back_testing(self.data, "MA")
+        self.expected = 1
         decisions = self.data.query(self.data.MA != 0)
-        expected = 1
         if len(decisions) != 0:
             for index, row in decisions.iterrows():
-                expected = expected / row['Close'] if row['MA'] > 0 else expected * row['Close']
+                self.expected = self.expected / row['Close'] if row['MA'] > 0 else self.expected * row['Close']
 
             if decisions.tail(1).MA.tolist()[0] > 0:
-                expected *= self.data.tail(1).Close.tolist()[0]
+                self.expected *= self.data.tail(1).Close.tolist()[0]
 
-        return np.abs(actual - expected) < 10 * np.finfo(float).eps
+        return np.abs(self.actual - self.expected) < 10 * np.finfo(float).eps
 
     def test_pnl_should_be_1_without_trading(self):
         self.data["Close"] = np.repeat(1, 10)
@@ -104,3 +86,27 @@ class BackTestingTester(unittest.TestCase):
             self.data["MA"][buy] = 1
         for sell in sells:
             self.data["MA"][sell] = -1
+
+
+def try_multiple_operations(item):
+    new_value = item**1000
+
+
+class POCTester(unittest.TestCase):
+
+    def setUp(self):
+        pass
+
+    def test_multi_threading(self):
+
+        start = time.time()
+        for number in np.random.rand(100, 1):
+            try_multiple_operations(number)
+        print time.time() - start
+
+        start = time.time()
+        executor = concurrent.futures.ProcessPoolExecutor(10)
+        future = [executor.submit(try_multiple_operations, number) for number in np.random.rand(100, 1)]
+        concurrent.futures.wait(future)
+        print time.time() - start
+
