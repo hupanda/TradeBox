@@ -1,9 +1,7 @@
 __author__ = 'PacAir'
 import unittest
-import pandas
-import numpy as np
-from MarketData.MarketData import *
-from MarketData.Frequency import *
+from Utility.MarketData import *
+from Utility.Frequency import *
 from Strategy.Strategy import *
 
 
@@ -16,18 +14,14 @@ class CommonStrategyTester(unittest.TestCase):
                              "SP": "StrategySupport", "BB": "StrategyBollingerBand"}
 
     def test_factory_should_return_correct_class(self):
-        result = True
         for strategyName in self.strategyList:
             strategy = StrategyFactory.get_strategy(strategyName)
-            result = result and strategy.__class__.__name__ == self.strategyList[strategyName]
-        assert result
+            assert strategy.__class__.__name__ == self.strategyList[strategyName]
 
     def test_strategy_should_return_no_signal_given_flat_data(self):
-        result = []
         for strategyName in self.strategyList:
             strategy = StrategyFactory.get_strategy(strategyName)
-            result.append(strategy.get_trading_decision(self.data))
-        assert all(r == 0 for r in result)
+            assert strategy.get_trading_decision(self.data) == 0
 
 
 class MAStrategyTester(unittest.TestCase):
@@ -37,6 +31,8 @@ class MAStrategyTester(unittest.TestCase):
         self.data = pandas.DataFrame(np.repeat(1, 10))
         self.data.columns = ['Close']
         self.strategy = StrategyFactory.get_strategy(self.name)
+        self.strategy.long_window = 5
+        self.strategy.short_window = 1
 
     def test_strategy_should_return_buy_signal_with_last_high_price(self):
         self.data["Close"][9] = 2
@@ -62,7 +58,7 @@ class MAStrategyTester(unittest.TestCase):
         assert np.sum(abs(result[self.name])) == 0
 
     def test_strategy_with_real_data(self):
-        start = "2013-12-01"
+        start = "2013-01-01"
         end = "2013-12-31"
         frequency = Frequency.Day.value
         ref = MarketData("YAHOO/INDEX_GSPC")
@@ -79,6 +75,8 @@ class MomentumStrategyTester(MAStrategyTester):
         self.data = pandas.DataFrame(np.repeat(1, 10))
         self.data.columns = ['Close']
         self.strategy = StrategyFactory.get_strategy(self.name)
+        self.strategy.long_window = 5
+        self.strategy.short_window = 4
 
     def test_strategy_with_up_and_down_data(self):
         self.data["Close"][1:4] = 2
@@ -102,3 +100,4 @@ class BollingerStrategyTester(MAStrategyTester):
         self.data = pandas.DataFrame(np.repeat(1, 10))
         self.data.columns = ['Close']
         self.strategy = StrategyFactory.get_strategy(self.name)
+        self.strategy.long_window = 5

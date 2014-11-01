@@ -1,4 +1,3 @@
-__author__ = 'PacAir'
 from enum import Enum
 
 
